@@ -2,7 +2,7 @@ Extend Class MRCinemo_Handler
 {
 	Override Void RenderOverlay(RenderEvent e)
 	{
-		if(!demoplayback || MRCinDem_Mode==1)Return;
+		if(!MRCinDem_Debug || !demoplayback || MRCinDem_Mode==1)Return;
 		
 		Let Sb = StatusBar;
 		bool OriginalFullscreen = Sb.FullscreenOffsets;
