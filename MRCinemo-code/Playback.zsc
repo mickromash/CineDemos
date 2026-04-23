@@ -1,0 +1,279 @@
+Extend Class MRCinemo_Handler
+{
+	Void PlaybackRegister()
+	{
+		if(MRCinDem_Saved == "")Return;
+		
+		ReadSave(MRCinDem_Saved);
+		
+		if(Commands.Size()<1)Return;
+	}
+	
+	Void ReadSave(String Save)
+	{
+		Commands.Clear();
+
+		While(Save.IndexOf("S")>-1){
+			MRCinemo_Cmd Cmd = New('MRCinemo_Cmd');
+			String Com = Save.Left(Save.IndexOf(","));
+			
+			String Temp = Com.Mid(Save.IndexOf("S")+1);
+			Temp = Temp.Left(Temp.IndexOf(" "));
+			Cmd.Start = Temp.ToInt();
+			
+			Temp = Com.Mid(Com.IndexOf("L")+1);
+			Temp = Temp.Left(Temp.IndexOf(" "));
+			Cmd.Length = Temp.ToInt();
+			
+			Temp = Com.Mid(Com.IndexOf("T")+1);
+			Temp = Temp.Left(Temp.IndexOf(" "));
+			Cmd.Type = Temp.ToInt();
+			
+			Temp = Com.Mid(Com.IndexOf("I")+1);
+			Temp = Temp.Left(Temp.IndexOf(" "));
+			Cmd.Id = Temp.ToInt();
+			
+			Temp = Com.Mid(Com.IndexOf("PX")+2);
+			Temp = Temp.Left(Temp.IndexOf(" "));
+			Cmd.Pos.X = Temp.ToInt();
+			Temp = Com.Mid(Com.IndexOf("PY")+2);
+			Temp = Temp.Left(Temp.IndexOf(" "));
+			Cmd.Pos.Y = Temp.ToInt();
+			Temp = Com.Mid(Com.IndexOf("PZ")+2);
+			Temp = Temp.Left(Temp.IndexOf(" "));
+			Cmd.Pos.Z = Temp.ToInt();
+			
+			int Arg;
+			While(Com.IndexOf("AR")>-1){
+				Temp = Com.Mid(Com.IndexOf("AR"..Arg));
+				Temp = Temp.Mid(Temp.IndexOf(" ")+1);
+				Temp = Temp.Left(Temp.IndexOf(" "));
+				Cmd.Args[Arg] = Temp.ToInt();
+				Com = Com.Mid(Com.IndexOf("AR"));
+				Com = Com.Mid(Com.IndexOf(" ", 1));
+				Arg++;
+			}
+			
+			Commands.Push(Cmd);
+			
+			Save = Save.Mid(Save.IndexOf(",")+1);
+		}
+	}
+	
+	Void PlaybackSpawned(WorldEvent e)
+	{
+	}
+	
+	Void PlaybackDamaged(WorldEvent e)
+	{
+	}
+	
+	int CmdNum, 
+		Frame;
+	Void PlaybackTick()
+	{
+		Frame++;
+		if(Commands.Size()>CmdNum){
+			if(Commands[CmdNum].Start<=Level.Time){
+				if(Commands[CmdNum].Type == MRCDCT_Monst && Commands[CmdNum].Id>=Monsters.Size())Return;
+				ApplyCommand(Commands[CmdNum]);
+				CmdNum++;
+				Frame = 0;
+			}
+			else if(Frame>=35*6){
+				if(CmdNum>0){
+					if(Commands[CmdNum-1].Type<2 && Commands[CmdNum-1].Length > Frame)Return;
+				}
+				if(Commands[CmdNum].Start<=Level.Time+35*2){
+					if(Commands[CmdNum].Type == MRCDCT_Monst && Commands[CmdNum].Id>=Monsters.Size())Return;
+					ApplyCommand(Commands[CmdNum]);
+					CmdNum++;
+					Frame = 0;
+				}
+				else {
+					Let Cmd = New('MRCinemo_Cmd');
+					Cmd.Start = Level.Time;
+					Cmd.Length = MRCinemo_MST;
+					Cmd.Type = CRandom(1, 2);
+					Cams[0].UpdateMode(Cmd);
+					Commands.Insert(CmdNum, Cmd);
+					Frame = 0;
+				}
+			}
+		}
+	}
+	
+	Void PlaybackStop()
+	{
+	}
+	
+	Void ApplyCommand(MRCinemo_Cmd Cmd)
+	{
+		Cams[0].UpdateMode(Cmd);
+	}
+}
+
+Class MRCinemo_Camera : Actor
+{
+	MRCinemo_Handler Handler;
+	
+	Float pow (Float x, int n)
+	{
+		Float y = 1;
+		while (n-- > 0)y *= x;
+		return y;
+	}
+	
+	Double Zoom, TargZoom, OldAng;
+	int Mode, OldMode;
+	Bool Interpolate, Working;
+	
+	Default
+	{
+		+NOGRAVITY
+		+NOINTERACTION
+		+NOBLOCKMAP
+	}
+	
+	Override Void PostBeginPlay()
+	{
+		Super.PostBeginPlay();
+		Zoom = 1;
+		Handler = MRCinemo_Handler(EventHandler.Find("MRCinemo_Handler"));
+		if(demoplayback)Working = true;
+	}
+	Override Void Tick()
+	{
+		if(!Working)Return;
+		Super.Tick();
+		Shooting();
+	}
+	
+	Virtual Void Shooting()
+	{
+		if(!Master)Return;
+		
+		Switch(Mode)
+		{
+			Case MRCDCT_Plr:
+				CameraFOV = Players[ConsolePlayer].DesiredFOV;
+				/*if(Interpolate){
+					Vector3 
+					if()
+				}
+				else */
+				SetOrigin(Master.Pos + (0,0,Master.Height*.8), true);
+				Break;
+			Case MRCDCT_Chase:
+				CameraFOV = Players[ConsolePlayer].DesiredFOV;
+				MoveToShoulder(Master);
+				
+				Angle += DeltaAngle(Angle, Master.Angle)/3;
+				Pitch += DeltaAngle(Pitch, Master.Pitch)/3;
+				Roll += DeltaAngle(Roll, Master.Roll)/3;
+				Break;
+			Case MRCDCT_Monst:
+				SetOrigin(Master.Pos + (AngleToVector(Master.AngleTo(Players[ConsolePlayer].mo), 1), Master.Height*.8), true);
+				
+				if(Master.Target){
+					if(Master.Target == Players[ConsolePlayer].mo)
+					{
+						Angle += DeltaAngle(Angle, AngleTo(Players[ConsolePlayer].mo))/3;
+						Pitch += DeltaAngle(Pitch, PitchTo(Players[ConsolePlayer].mo, 0, Players[ConsolePlayer].mo.Height*.8))/3;
+						
+						if(Distance3D(Players[ConsolePlayer].mo)>400)
+						{
+							TargZoom = Pow(.9, (Distance3D(Players[ConsolePlayer].mo)-400)*.02);
+						}
+						else TargZoom = 1.0;
+						
+						if(TargZoom > Zoom)Zoom += Clamp((TargZoom-Zoom)/4, -.1*Zoom, .1*Zoom);
+						else Zoom -= Clamp((Zoom-TargZoom)/4, -.1*Zoom, .1*Zoom);
+						
+						CameraFOV = Players[ConsolePlayer].DesiredFOV * Zoom;
+					}
+					else {
+						CameraFOV = Players[ConsolePlayer].DesiredFOV;
+						Angle += DeltaAngle(Angle, Master.Angle)/3;
+						Pitch += DeltaAngle(Pitch, Master.Pitch)/3;
+						Roll += DeltaAngle(Roll, Master.Roll)/3;
+					}
+				}
+				
+				else {
+					CameraFOV = Players[ConsolePlayer].DesiredFOV;
+					Angle += DeltaAngle(Angle, Master.Angle)/3;
+					Pitch += DeltaAngle(Pitch, Master.Pitch)/3;
+					Roll += DeltaAngle(Roll, Master.Roll)/3;
+				}
+		}
+		
+		/*if(Interpolate){
+			if(Distance3D(Master.Pos)<4){SetOrigin();}
+		}*/
+	}
+	
+	Void UpdateMode(MRCinemo_Cmd Cmd)
+	{
+		Mode = Cmd.Type;
+		interpolate = false;
+		
+		if(Mode == MRCDCT_Plr && OldMode != MRCDCT_Chase)Players[ConsolePlayer].mo.SetCamera(Players[ConsolePlayer].mo);
+		else Players[ConsolePlayer].mo.SetCamera(Self);
+		Switch(Mode)
+		{
+			Case MRCDCT_Plr:
+				Master = Players[ConsolePlayer].mo;
+				if(OldMode == MRCDCT_Chase)Interpolate = true;
+				Break;
+			Case MRCDCT_Chase:
+				Master = Players[ConsolePlayer].mo;
+				if(OldMode == MRCDCT_Plr)Interpolate = true;
+				else {
+					MoveToShoulder(Master, false);
+					Angle = Master.Angle;
+					Pitch = Master.Pitch;
+				}
+				Break;
+			Case MRCDCT_Monst:
+				if(!Handler)Handler = MRCinemo_Handler(EventHandler.Find("MRCinemo_Handler"));
+				Master = Handler.Monsters[Cmd.Id];
+				
+				if(!Master)Return;
+				
+				interpolate = false;
+				if(OldMode == Mode){
+					FLineTraceData data;
+					Master.LineTrace(AngleTo(Master)+180, 200, PitchTo(Master, 0, Master.Height*.8), TRF_THRUACTORS, 0,0,0, data);
+					if(data.HitType == TRACE_HitNone)interpolate = true;
+				}
+				
+				if(!Interpolate){
+					if(Players[ConsolePlayer].mo)SetOrigin(Master.Pos + (AngleToVector(Master.AngleTo(Players[ConsolePlayer].mo), 1), Master.Height*.8), false);
+					
+					Angle = Master.Angle;
+					Pitch = Master.Pitch;
+					
+					if(Master.Target && Master.Target == Players[ConsolePlayer].mo)
+					{
+						Angle = Master.AngleTo(Players[ConsolePlayer].mo);
+						Pitch = Master.PitchTo(Players[ConsolePlayer].mo, Master.Height*.8, Players[ConsolePlayer].mo.Height*.8);
+					}
+				}
+				Break;
+		}
+		
+		OldMode = Mode;
+	}
+	
+	Void MoveToShoulder(Actor Master, bool Interpolate = true)
+	{
+		Vector3 Pos = Master.Pos;
+		
+		Pos.Z += Master.Height*1+Master.Radius*2*Sin(Pitch);
+		Pos.XY += AngleToVector(Master.Angle+90, Master.Radius*1.5);
+		Pos.XY -= AngleToVector(Master.Angle, Master.Radius*3)*Cos(Abs(Pitch));
+		
+		SetOrigin(Pos, Interpolate);
+	}
+}

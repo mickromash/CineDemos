@@ -1,0 +1,32 @@
+Extend Class MRCinemo_Handler
+{
+	Override Void RenderOverlay(RenderEvent e)
+	{
+		if(!demoplayback || MRCinDem_Mode==1)Return;
+		
+		Let Sb = StatusBar;
+		bool OriginalFullscreen = Sb.FullscreenOffsets;
+		Sb.FullscreenOffsets = true;
+		
+		HUDFont SmallFnt = HUDFont.Create("SmallFont");
+		HUDFont BigFnt = HUDFont.Create("BigFont");
+		
+		Vector2 Pos = (10, 30-CmdNum*7);
+		
+		For(int i=0;i<Commands.Size();i++){
+			Bool Sel = i==CmdNum-1;
+			Sb.DrawString(SmallFnt, "Com["..i.."] S "..Commands[i].Start.." L "..Commands[i].Length.." T "..Commands[i].Type,
+				Pos + (0, i*7), Sb.DI_SCREEN_LEFT_TOP, Sel?Font.CR_FIRE:Font.CR_GREY, .8);
+		}
+		
+		Pos = (10, -20);
+		
+		if(Cams[0] && Cams[0].Master)Sb.DrawString(SmallFnt, "Mode: "..Cams[0].Mode.." Mast: "..Cams[0].Master.GetClassName(), 
+			Pos, Sb.DI_SCREEN_LEFT_BOTTOM);
+		
+		Pos = (-100, 30);
+		Sb.DrawString(BigFnt, ""..Level.Time, Pos, Sb.DI_SCREEN_RIGHT_TOP);
+		Pos.Y += 15;
+		Sb.DrawString(BigFnt, ""..Frame, Pos, Sb.DI_SCREEN_RIGHT_TOP);
+	}
+}

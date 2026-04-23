@@ -1,0 +1,8 @@
+nosave bool MRCinDem_Active = True;
+nosave int MRCinDem_Mode = 0;//0 - Auto, 1 - Record, 2 - Playback
+nosave noarchive bool MRCinDem_Recording = false;
+nosave bool MRCinDem_Guessing = false;
+
+nosave string MRCinDem_Saved = "";
+
+nosave noarchive bool MRCinDem_Debug = False;

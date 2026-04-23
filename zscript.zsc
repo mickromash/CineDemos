@@ -1,0 +1,126 @@
+Version "4.0"
+
+#include "MRCinemo-code/Recording.zsc"
+#include "MRCinemo-code/Playback.zsc"
+#include "MRCinemo-code/PlayGuess.zsc"
+#include "MRCinemo-code/HUD.zsc"
+
+Const CamDeathTime = 24;
+Const MRCinemo_Cams = 5;
+
+Class MRCinemo_Handler: EventHandler
+{
+	MRCinemo_Camera Cams[MRCinemo_Cams];
+		
+	Array<Actor> Monsters, Projectiles;
+	
+	Override Void WorldThingSpawned(WorldEvent e)
+	{
+		if(!e.Thing)Return;
+		
+		if(e.Thing.bIsMonster)Monsters.Push(e.Thing);
+		
+		if(e.Thing.bMissile)Projectiles.Push(e.Thing);
+		
+		Switch(MRCinDem_Mode)
+		{
+			Case 0:
+				if(demoplayback)PlaybackSpawned(e);
+				else if(MRCinDem_Recording)RecordSpawned(e);
+				Break;
+			Case 1:
+				if(MRCinDem_Recording)RecordSpawned(e);
+				Break;
+			Case 2:
+				PlaybackSpawned(e);
+				Break;
+		}
+	}
+	
+	Bool Started;
+	
+	Override Void OnRegister()
+	{
+	}
+	
+	Override Void WorldTick()
+	{
+		if(!Started){
+			Started = true;
+			
+			if(!MRCinDem_Active)Return;
+		
+			For(int i=0;i<MRCinemo_Cams;i++){
+				Cams[i] = MRCinemo_Camera(Actor.Spawn("MRCinemo_Camera"));
+			}
+			
+			Console.Printf("Mode: "..MRCinDem_Mode.." Dem "..demoplayback);
+			
+			
+			Switch(MRCinDem_Mode)
+			{
+				Case 0:
+					if(demoplayback)PlaybackRegister();
+					else if(MRCinDem_Recording)RecordRegister();
+					Break;
+				Case 1:
+					if(MRCinDem_Recording)RecordRegister();
+					Break;
+				Case 2:
+					PlaybackRegister();
+					Break;
+			}
+			Return;
+		}
+
+		Switch(MRCinDem_Mode)
+		{
+			Case 0:
+				if(demoplayback)PlaybackTick();
+				else if(MRCinDem_Recording)RecordTick();
+				Break;
+			Case 1:
+				if(MRCinDem_Recording)RecordTick();
+				Break;
+			Case 2:
+				PlaybackTick();
+				Break;
+		}
+	}
+	
+	Override Void OnDestroy()
+	{
+		Switch(MRCinDem_Mode)
+		{
+			Case 0:
+				if(demoplayback)PlaybackStop();
+				else if(MRCinDem_Recording)RecordStop();
+				Break;
+			Case 1:
+				if(MRCinDem_Recording)RecordStop();
+				Break;
+			Case 2:
+				PlaybackStop();
+				Break;
+		}
+		
+		Super.OnDestroy();
+	}
+	
+	Override Void WorldUnloaded(WorldEvent e)
+	{
+		Switch(MRCinDem_Mode)
+		{
+			Case 0:
+				if(demoplayback)PlaybackStop();
+				else if(MRCinDem_Recording)RecordStop();
+				Break;
+			Case 1:
+				if(MRCinDem_Recording)RecordStop();
+				Break;
+			Case 2:
+				PlaybackStop();
+				Break;
+		}
+	}
+}

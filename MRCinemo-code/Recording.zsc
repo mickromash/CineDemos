@@ -1,0 +1,384 @@
+Const MRCinemo_MST = 35*3;
+Const MRCinemo_MinHealth = .25;
+
+Extend Class MRCinemo_Handler
+{
+	Array<Thinker> Thinkers;
+	
+	Void RecordRegister()
+	{
+		Thinkers.Clear();
+		
+		Thinkers.Push(New('MRCinemo_PlayerActionRecorder'));
+		Thinkers.Push(New('MRCinemo_PlayerLowHealth'));
+	}
+	
+	Void RecordSpawned(WorldEvent e)
+	{
+		if(e.Thing.bIsMonster){
+			MRCinemo_MonsterRecorder Rec = New('MRCinemo_MonsterRecorder');
+			
+			Rec.Master = e.Thing;
+			Rec.Id = Monsters.Size()-1;
+			
+			Thinkers.Push(Rec);
+		}
+	}
+	
+	Array<MRCinemo_Note> PlrAction, PlrLHP, MonstNotes;
+	
+	Void RecordDamaged(WorldEvent e)
+	{
+		
+		/*if(!e.Thing || e.Thing != Players[ConsolePlayer].mo)Return;
+		
+		if(e.DamageSource != e.Thing && e.Inflictor != e.Thing)Return;
+		
+		PlrActions.TookDamage();*/
+	}
+	
+	Array<MRCinemo_Cmd> Commands;
+	
+	Void RecordStop()
+	{
+		For(int i=0;i<Thinkers.Size();i++){
+			if(Thinkers[i])Thinkers[i].Destroy();
+		}
+		Commands.Clear();
+		
+		int Skip, Skip1;
+		Console.Printf("Time: "..Level.time);
+		Console.Printf("PlrLHP: "..PlrLHP.Size());
+		Console.Printf("PlrAction: "..PlrAction.Size());
+		Console.Printf("MonstNotes: "..MonstNotes.Size());
+		
+		For(int Tic=0;Tic<Level.Time;Tic++)
+		{
+			if(Skip>0){
+				Skip--;
+				Continue;
+			}
+			
+			For(int i=0;i<PlrLHP.Size();i++){//Low hp episodes
+				if(PlrLHP[i].Start + PlrLHP[i].Length<Tic){PlrLHP.Delete(i);i--;Continue;}
+				
+				if(PlrLHP.Size()>0 && PlrLHP[i].Start <= Tic+5){
+					Skip = PlrLHP[i].Length;
+					
+					NewCommand(Tic, PlrLHP[i].Length);
+					Console.Printf("Tick: "..Tic.." LowHP "..PlrLHP[i].Length);
+					PlrLHP.Delete(i);
+				}
+			}
+			
+			if(Skip1>0){
+				Skip1--;
+				Continue;
+			}
+			
+			if(Skip>0)Continue;
+			
+			For(int i=0;i<PlrAction.Size();i++){//No firing episodes
+				if(PlrAction[i].Start + PlrAction[i].Length<Tic){PlrAction.Delete(i);i--;Continue;}
+				
+				if(PlrAction.Size()>0 && PlrAction[i].Start <= Tic+5){
+					Skip = PlrAction[i].Length;//MRCinemo_MST;
+					
+					NewCommand(Tic, PlrAction[i].Length, MRCDCT_Chase);
+					Console.Printf("Tick: "..Tic.." Action "..PlrAction[i].Length);
+					PlrAction.Delete(i);
+				}
+			}
+			
+				
+			For(int i=0;i<MonstNotes.Size();i++){
+				if(MonstNotes[i].Start + MonstNotes[i].Length<Tic){MonstNotes.Delete(i);i--;Continue;}
+				
+				if(MonstNotes.Size()>0 && MonstNotes[i].Start <= Tic){
+					if(MonstNotes[i].Args[0]<=Tic+10){//Skip if monster is already dead or will die very soon
+						MonstNotes.Delete(i);
+						i--;
+						Continue;
+					}
+					Skip1 = Min(MonstNotes[i].Args[0]-MonstNotes[i].Start+35, MonstNotes[i].Length);
+					
+					NewCommand(Tic, MonstNotes[i].Length, MRCDCT_Monst, MonstNotes[i].Id);
+					Console.Printf("Tick: "..Tic.." Monst "..MonstNotes[i].Length.." "..MonstNotes[i].Id);
+					MonstNotes.Delete(i);
+				}
+			}
+			
+			/*if(Skip < -10 && Skip1 < -10){
+				if(PlrAction.Size()>0 && PlrAction[0].Start <= Tic-35*2)Continue;
+				
+				NewCommand(Tic, MRCinemo_MST);
+				Skip = MRCinemo_MST;
+			}*/
+		}
+		
+		WriteSave();
+	}
+	
+	Void WriteSave()
+	{
+		Console.Printf("Writing");
+		String Save;
+		
+		For(int i=0;i<Commands.Size();i++){
+			Let Cmd = Commands[i];
+			
+			Save = Save.."S"..Cmd.Start.." ";
+			Save = Save.."L"..Cmd.Length.." ";
+			Save = Save.."T"..Cmd.Type.." ";
+			Save = Save.."I"..Cmd.Id.." ";
+			Save = Save.."PX"..int(Cmd.Pos.X).." PY"..int(Cmd.Pos.Y).." PZ"..int(Cmd.Pos.Z).." ";
+			For(int i=0;i<Cmd.Args.Size();i++){
+				if(Cmd.Args[i]!=0)Save = Save.."AR"..i.." "..Cmd.Args[i].." ";
+			}
+			Save = Save..",";
+		}
+		
+		if(Save.IndexOf("S")>-1){
+			CVar.FindCVar("MRCinDem_Saved").SetString(Save);
+			Console.Printf("Saved "..Save);
+			CVar.FindCVar("MRCinDem_Recording").SetBool(0);
+		}
+		else Console.Printf("No data to save");
+	}
+	
+	MRCinemo_Cmd NewCommand(int Start, int Length, int Type = MRCDCT_Plr, int Id=0, Vector3 Pos=(0,0,0), bool ToArray = true)
+	{
+		MRCinemo_Cmd a = New('MRCinemo_Cmd');
+		
+		a.Start = Start;
+		a.Length = Length;
+		a.Type = Type;
+		a.Id = Id;
+		a.Pos = Pos;
+		
+		if(ToArray)Commands.Push(a);
+		
+		Return a;
+	}
+	
+	Void RecordTick()
+	{
+	}
+}
+
+Enum MRCinemo_CmdTypes
+{
+	MRCDCT_Plr = 1,
+	MRCDCT_Chase = 2,
+	MRCDCT_Monst = 3,
+	MRCDCT_Misl = 4,
+	MRCDCT_Loc = 5
+}
+
+Class MRCinemo_Cmd
+{
+	int Start, Length, Type, Id, Args[4];
+	Vector3 Pos;
+}
+
+Class MRCinemo_Note
+{
+	int Start, Length, Id, Args[4];
+	Vector3 Pos;
+}
+
+Class MRCinemo_Recorder: thinker
+{
+	int Recorded, MinRecTime;
+	Array<MRCinemo_Note> Notes;
+	
+	Virtual Void SetDefault()
+	{
+		MinRecTime = MRCinemo_MST;
+	}
+	
+	Override Void PostBeginPlay()
+	{
+		Console.Printf("PostB "..GetClassName());
+		SetDefault();
+	}
+	
+	Override Void Tick()
+	{
+		Recorded++;
+		Recording();
+	}
+	
+	VirtuaL Void Recording(){}
+	
+	Virtual Void NewNote(int Time, int Id = 0, Vector3 Pos = (0,0,0), int Args1=0, int Args2=0, int Args3=0, int Args4=0)
+	{
+		if(Time<MinRecTime)Return;
+		MRCinemo_Note Note = New('MRCinemo_Note');
+		
+		Note.Length = Time;
+		Note.Start = Level.Time - Time;
+		
+		Note.Id = Id;
+		Note.Pos = Pos;
+		
+		Note.Args[0]=Args1;
+		Note.Args[1]=Args2;
+		Note.Args[2]=Args3;
+		Note.Args[3]=Args4;
+		
+		Notes.Push(Note);
+	}
+}
+
+Class MRCinemo_PlayerActionRecorder: MRCinemo_Recorder
+{
+	int Punches;
+	PlayerPawn Plr;
+	
+	Override Void PostBeginPlay()
+	{
+		Super.PostBeginPlay();
+		if(!Plr)Plr = Players[ConsolePlayer].mo;
+	}
+	
+	Override Void SetDefault()
+	{
+		MinRecTime = 35*5;
+	}
+		
+	Override Void Recording()
+	{
+		if(Punches>0)Punches--;
+		if(Plr.Player.ReadyWeapon && (
+			Actor.InStateSequence(Plr.Player.FindPSprite(PSP_WEAPON).CurState, Plr.Player.ReadyWeapon.FindState("Fire"))||
+			Actor.InStateSequence(Plr.Player.FindPSprite(PSP_WEAPON).CurState, Plr.Player.ReadyWeapon.FindState("AltFire"))))
+		{
+			if(Plr.Player.ReadyWeapon.bMELEEWEAPON){
+				Punches += 4;
+				if(Punches<80)Return;
+			}
+			
+			NewNote(Recorded);
+			
+			Recorded = 0;
+			Punches = 0;
+		}
+	}
+	
+	Override Void OnDestroy()
+	{
+		Let Handler = MRCinemo_Handler(EventHandler.Find("MRCinemo_Handler"));
+		if(!Handler){Super.OnDestroy(); Return;}
+		
+		if(Recorded>0)NewNote(Recorded);
+		
+		Handler.PlrAction.Append(Notes);
+	}
+}
+
+Class MRCinemo_PlayerLowHealth: MRCinemo_PlayerActionRecorder
+{
+	Override Void Recording()
+	{
+		if(Plr && Plr.HealtH>Plr.GetMaxHealth()*MRCinemo_MinHealth)
+		{
+			NewNote(Recorded);
+			Recorded = 0;
+		}
+	}
+	
+	Override Void OnDestroy()
+	{
+		Let Handler = MRCinemo_Handler(EventHandler.Find("MRCinemo_Handler"));
+		if(!Handler){Super.OnDestroy(); Return;}
+		
+		if(Recorded>0)NewNote(Recorded);
+		
+		Handler.PlrLHP.Append(Notes);
+	}
+}
+
+Class MRCinemo_MonsterRecorder: MRCinemo_Recorder
+{
+	Bool Stoped;
+	Actor Master;
+	int Id, DeathTime;
+		
+	Virtual Bool SeePlayer()
+	{
+		if(!Master)Return false;
+		
+		Let Plr = Players[ConsolePlayer].mo;
+		
+		if(!Plr)Return false;
+		
+		Let Tracer = New('MRCinemo_SightTracer');
+		if(!Tracer)return false;
+		
+		Double Dist2 = Master.Distance2D(Plr);
+		Vector3 Dist3 = Level.Vec3Diff(Plr.Pos, Master.Pos);
+		
+		Tracer.Target = Plr;
+		Double Pitch = Master.PitchTo(Plr, Master.Height*.8, Plr.Height*.6);
+		Vector3 Direct = (Master.AngleToVector(Master.AngleTo(Plr), Cos(Pitch)), -Sin(Pitch));
+		Tracer.Trace(Master.Pos + (0,0,Master.Height*.8), Master.CurSector, direct, Dist3.Length()+5, 0, Line.ML_BLOCKEVERYTHING);
+		
+		
+		Return Dist2<2000 && Tracer.HitTarget;//SF_IGNOREWATERBOUNDARY|SF_SEEPASTBLOCKEVERYTHING|SF_IGNOREVISIBILITY);
+	}
+	
+	Override Void Tick()
+	{
+		if(Stoped)Return;
+		Super.Tick();
+	}
+	
+	Override Void Recording()
+	{
+		if(DeathTime==0 && Master.Health<=0)DeathTime = Level.Time;
+		
+		if(!Master){
+			NewNote(Recorded-1, Id, Args1: DeathTime);
+			Stoped = true;
+			Recorded = 0;
+			Return;
+		}
+		
+		if(!SeePlayer()){
+			if(Master.Target || (Master.LastLookActor && Master.LastLookActor == Players[ConsolePlayer].mo))NewNote(Recorded-1, Id, Args1: DeathTime);
+			Recorded = 0;
+			if(Master.Health<=0)Stoped = true;
+		}
+	}
+	
+	Override Void OnDestroy()
+	{
+		Let Handler = MRCinemo_Handler(EventHandler.Find("MRCinemo_Handler"));
+		if(!Handler){Super.OnDestroy(); Return;}
+		
+		if(Recorded>0 && !Stoped)NewNote(Recorded-1, Args1: DeathTime);
+		
+		Handler.MonstNotes.Append(Notes);
+	}
+}
+
+Class MRCinemo_SightTracer: LineTracer
+{
+	Actor Target;
+	Bool HitTarget;
+	Vector3 HitPos;
+	
+	override ETraceStatus TraceCallback()
+	{
+		if(results.HitType!=TRACE_HitActor &&
+			results.HitType!=TRACE_HitNone)Return TRACE_Stop;
+		HitTarget = false;
+		if(results.HitActor && results.HitActor == Target){
+			HitTarget = true;
+			HitPos = results.HitPos;
+			Return TRACE_Stop;
+		}
+		Return TRACE_Skip;
+	}
+}
