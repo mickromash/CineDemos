@@ -12,6 +12,7 @@ First one can be 3 values: 0 (Auto), 1 (force recording) and 2 (force playing). 
 `MRCinDem_Saved` is a string CVar that stores recorded events. There's no need in any interaction with it other than typing it into a console to check its current content.
 
 
+
 So, if you are using the mod and want to watch a demo with it right after recording it, you need to set `MRCinDem_Mode` to 0, `MRCinDem_Recording` to 1, finish a demo and just play it.
 If you want to some other demo, or a demo that was recorded previously without this mod, you'll have to play it 2 times, first time for the mod to record the events and second time to run them. For that, set `MRCinDem_Mode` and `MRCinDem_Recording` to 1, play a wanted demo once (you can set `i_timescale` CVar to value 2 or more to speed it up, it won't affect events recording), after it's finished set `MRCinDem_Mode` to 0 and play a demo again.
 
